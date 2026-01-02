@@ -1,4 +1,4 @@
-# WhatsApp Service
+# WhatsApp Adapter
 
 A service component for the HAI-INDEXER system that handles WhatsApp integration and messaging functionality.
 
