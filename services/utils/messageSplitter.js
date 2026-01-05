@@ -25,6 +25,8 @@ function splitMessage(message, maxLength = WHATSAPP_MESSAGE_MAX_LENGTH) {
 
   const chunks = [];
   let remaining = message;
+  const totalLength = message.length;
+  const estimatedTotalChunks = Math.ceil(totalLength / maxLength);
 
   while (remaining.length > 0) {
     // If remaining fits, add it and break
@@ -60,16 +62,9 @@ function splitMessage(message, maxLength = WHATSAPP_MESSAGE_MAX_LENGTH) {
       }
     }
 
-    // Extract chunk and add continuation indicator
+    // Extract chunk (no indicator here - will be added by splitMessageWithIndicators)
     const chunkText = remaining.substring(0, splitIndex).trim();
-    const totalChunks = Math.ceil(message.length / maxLength);
-    const chunkNumber = chunks.length + 1;
-    
-    if (totalChunks > 1) {
-      chunks.push(`[${chunkNumber}/${totalChunks}]\n\n${chunkText}`);
-    } else {
-      chunks.push(chunkText);
-    }
+    chunks.push(chunkText);
 
     // Remove processed chunk from remaining
     remaining = remaining.substring(splitIndex).trim();
@@ -92,9 +87,8 @@ function splitMessageWithIndicators(message) {
 
   // Add page indicators to each chunk
   return chunks.map((chunk, index) => {
-    // Remove existing indicator if present (from splitMessage)
-    const cleanedChunk = chunk.replace(/^\[\d+\/\d+\]\n\n/, '');
-    return `[Part ${index + 1}/${chunks.length}]\n\n${cleanedChunk}`;
+    // splitMessage no longer adds indicators, so just add them here
+    return `[Part ${index + 1}/${chunks.length}]\n\n${chunk}`;
   });
 }
 

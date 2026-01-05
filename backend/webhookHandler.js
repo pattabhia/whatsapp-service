@@ -8,7 +8,10 @@ const { processWithIdempotency } = require('../services/idempotency-service/idem
 
 const { WHATSAPP_MESSAGE_MAX_LENGTH } = whatsappService;
 
-const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
+const { getEnvVar } = require('../services/utils/envHelper');
+
+// Support both old and new variable names for backward compatibility
+const VERIFY_TOKEN = getEnvVar('WEBHOOK_VERIFY_TOKEN', 'VERIFY_TOKEN');
 
 /**
  * Handle WhatsApp webhook verification

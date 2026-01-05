@@ -1,5 +1,6 @@
 const express = require('express');
 const webhookHandler = require('./webhookHandler');
+const healthChecks = require('./health');
 // Use Redis-based rate limiter if Redis is available, otherwise fall back to in-memory
 const { webhookRateLimiter } = require('./middleware/rateLimiterRedis');
 
@@ -11,10 +12,15 @@ app.set('trust proxy', 1);
 // Middleware
 app.use(express.urlencoded({ extended: true }));
 
-// Health check
+// Health check endpoints
 app.get('/', (req, res) => {
   res.json({ status: 'ok', service: 'whatsapp-middleware' });
 });
+
+// Kubernetes-style health checks
+app.get('/health', healthChecks.health);
+app.get('/ready', healthChecks.readiness);
+app.get('/live', healthChecks.liveness);
 
 // WhatsApp webhook endpoints with rate limiting
 app.get('/webhook', webhookRateLimiter, webhookHandler.verify);
@@ -44,8 +50,19 @@ if (require.main === module) {
   // Validate environment variables
   require('./test-setup').validateEnv();
   
+  // Validate configuration values
+  try {
+    require('./config-validator').validateConfig();
+  } catch (error) {
+    console.error('Configuration validation failed:', error.message);
+    process.exit(1);
+  }
+  
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
+    const { createLogger } = require('../services/logging-service/logger');
+    const logger = createLogger();
+    logger.info('WhatsApp middleware server started', { port: PORT });
     console.log(`WhatsApp middleware running on port ${PORT}`);
   });
 }

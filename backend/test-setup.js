@@ -3,12 +3,17 @@
  * Print clear errors if missing
  */
 
-const requiredVars = [
-  'WHATSAPP_TOKEN',
-  'PHONE_NUMBER_ID',
-  'VERIFY_TOKEN',
-  'HAIINDEXER_API_URL',
+const { getEnvVar } = require('../services/utils/envHelper');
+
+// Check for required variables (supports both old and new names)
+const requiredVarMappings = [
+  { new: 'WHATSAPP_API_TOKEN', old: 'WHATSAPP_TOKEN' },
+  { new: 'WHATSAPP_PHONE_NUMBER_ID', old: 'PHONE_NUMBER_ID' },
+  { new: 'WEBHOOK_VERIFY_TOKEN', old: 'VERIFY_TOKEN' },
+  { new: 'HAIINDEXER_API_URL', old: null }, // No old name for this
 ];
+
+const requiredVars = requiredVarMappings.map(m => m.new);
 
 // Optional but recommended for production
 const recommendedVars = [
@@ -18,9 +23,10 @@ const recommendedVars = [
 function validateEnv() {
   const missing = [];
 
-  for (const varName of requiredVars) {
-    if (!process.env[varName]) {
-      missing.push(varName);
+  for (const mapping of requiredVarMappings) {
+    const value = getEnvVar(mapping.new, mapping.old);
+    if (!value) {
+      missing.push(mapping.new);
     }
   }
 

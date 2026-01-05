@@ -1,6 +1,14 @@
 /**
  * Redis client service
  * Provides centralized Redis connection management
+ * 
+ * NOTE: Redis is OPTIONAL. The service works without Redis using in-memory fallback.
+ * Redis is RECOMMENDED for:
+ * - Multi-instance deployments (shared rate limiting and idempotency)
+ * - Production environments (better reliability)
+ * 
+ * To use Redis, set REDIS_URL environment variable.
+ * Example: REDIS_URL=redis://localhost:6379
  */
 
 let redisClient = null;
@@ -41,15 +49,18 @@ function getRedisClient() {
 
     // Error handling
     redisClient.on('error', (error) => {
-      console.error('Redis client error:', error);
-      // Don't throw - allow fallback to in-memory store
+      // Log error but don't throw - allow fallback to in-memory store
+      // Using console.error here as Redis client events occur during initialization
+      console.error('Redis client error:', error.message);
     });
 
     redisClient.on('connect', () => {
+      // Using console.log here as this is initialization logging
       console.log('Redis client connected');
     });
 
     redisClient.on('ready', () => {
+      // Using console.log here as this is initialization logging
       console.log('Redis client ready');
     });
 

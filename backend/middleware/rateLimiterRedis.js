@@ -56,6 +56,7 @@ async function getRateLimitRecord(key, windowMs) {
         resetTime,
       };
     } catch (error) {
+      // Log warning but continue with fallback (middleware context)
       console.warn('Redis error in rate limiter, falling back to in-memory:', error.message);
       // Fall through to in-memory
     }
