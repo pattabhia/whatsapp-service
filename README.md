@@ -4,8 +4,6 @@ A production-ready middleware service that connects WhatsApp Business API to the
 
 ## Status
 
-✅ **Production Ready** - 95% Compliance
-
 All critical features implemented including circuit breaker, retry logic, rate limiting, idempotency, message splitting, and comprehensive error handling.
 
 ## Quick Start
@@ -30,7 +28,7 @@ Set required environment variables:
 export WHATSAPP_API_TOKEN="your_token"
 export WHATSAPP_PHONE_NUMBER_ID="your_phone_id"
 export WEBHOOK_VERIFY_TOKEN="your_verify_token"
-export HAIINDEXER_API_URL="https://api.haiindexer.com"
+export HAIINDEXER_API_URL="haiindexer_public_URL"
 
 # Recommended
 export WHATSAPP_APP_SECRET="your_app_secret"
@@ -100,7 +98,6 @@ See [Implementation Summary](docs/IMPLEMENTATION_SUMMARY.md) for detailed archit
 - **Deployment**: Vercel-ready, Docker/Kubernetes compatible
 
 ## Status
-
 
 - All critical features implemented
 - Comprehensive error handling
