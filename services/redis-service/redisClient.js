@@ -44,7 +44,8 @@ function getRedisClient() {
       },
       maxRetriesPerRequest: 3,
       enableReadyCheck: true,
-      lazyConnect: false,
+      lazyConnect: true, // Use lazy connection to prevent blocking during startup
+      connectTimeout: 5000, // 5 second connection timeout
     });
 
     // Error handling
@@ -52,6 +53,17 @@ function getRedisClient() {
       // Log error but don't throw - allow fallback to in-memory store
       // Using console.error here as Redis client events occur during initialization
       console.error('Redis client error:', error.message);
+      // Don't crash the server - Redis is optional
+    });
+
+    // Handle connection errors gracefully
+    redisClient.on('close', () => {
+      console.warn('Redis client connection closed');
+    });
+
+    // Prevent unhandled rejections from Redis
+    redisClient.on('reconnecting', () => {
+      console.log('Redis client reconnecting...');
     });
 
     redisClient.on('connect', () => {
@@ -76,8 +88,18 @@ function getRedisClient() {
  * @returns {boolean}
  */
 function isRedisAvailable() {
-  const client = getRedisClient();
-  return client !== null && client.status === 'ready';
+  try {
+    const client = getRedisClient();
+    if (!client) {
+      return false;
+    }
+    // With lazyConnect, status might be 'wait', 'connecting', or 'ready'
+    // Only return true if actually ready, false otherwise
+    return client.status === 'ready';
+  } catch (error) {
+    // If any error occurs, Redis is not available
+    return false;
+  }
 }
 
 /**
@@ -85,8 +107,20 @@ function isRedisAvailable() {
  */
 async function closeRedisClient() {
   if (redisClient) {
-    await redisClient.quit();
-    redisClient = null;
+    try {
+      await redisClient.quit();
+    } catch (error) {
+      // Log error but don't throw - graceful shutdown should continue
+      console.warn('Error closing Redis client:', error.message);
+      // Try to disconnect forcefully if quit fails
+      try {
+        redisClient.disconnect();
+      } catch (disconnectError) {
+        // Ignore disconnect errors
+      }
+    } finally {
+      redisClient = null;
+    }
   }
 }
 

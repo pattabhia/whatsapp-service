@@ -31,7 +31,8 @@ const app = express();
 app.set('trust proxy', 1);
 
 // Middleware
-app.use(express.urlencoded({ extended: true }));
+// Only parse URL-encoded bodies for POST requests (not needed for GET)
+app.use(express.urlencoded({ extended: true, type: 'application/x-www-form-urlencoded' }));
 
 // Health check endpoints
 app.get('/', (req, res) => {
@@ -56,9 +57,24 @@ app.get('/reminder', (req, res) => {
 });
 
 // Kubernetes-style health checks
+// Define /live first with minimal error handling
+app.get('/live', (req, res) => {
+  try {
+    res.status(200).json({
+      status: 'alive',
+      service: 'whatsapp-middleware',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    // If JSON fails, send plain text
+    if (!res.headersSent) {
+      res.status(200).send('alive');
+    }
+  }
+});
+
 app.get('/health', healthChecks.health);
 app.get('/ready', healthChecks.readiness);
-app.get('/live', healthChecks.liveness);
 
 // WhatsApp webhook endpoints with rate limiting
 app.get('/webhook', webhookRateLimiter, webhookHandler.verify);
@@ -71,6 +87,12 @@ app.post('/webhook', webhookRateLimiter, express.raw({ type: 'application/json' 
     req.rawBody = req.body;
     // Parse JSON body for processing
     try {
+      if (!req.body || !Buffer.isBuffer(req.body)) {
+        if (!res.headersSent) {
+          return res.status(400).json({ error: 'Invalid request body' });
+        }
+        return;
+      }
       req.body = JSON.parse(req.body.toString());
     } catch (error) {
       if (!res.headersSent) {
@@ -80,6 +102,14 @@ app.post('/webhook', webhookRateLimiter, express.raw({ type: 'application/json' 
     }
     next();
   } catch (error) {
+    // Log error for debugging
+    try {
+      const { createLogger } = require('../services/logging-service/logger');
+      const logger = createLogger();
+      logger.error('Error in webhook POST middleware', error);
+    } catch (loggerError) {
+      console.error('Error in webhook POST middleware:', error);
+    }
     if (!res.headersSent) {
       res.status(500).json({ error: 'Internal server error' });
     }
@@ -170,19 +200,27 @@ if (require.main === module) {
   }
   
   const PORT = process.env.PORT || 3000;
-  const server = app.listen(PORT, () => {
-    const { createLogger } = require('../services/logging-service/logger');
-    const logger = createLogger();
-    logger.info('WhatsApp middleware server started', { port: PORT });
-    console.log(`WhatsApp middleware running on port ${PORT}`);
-  });
+  let server;
+  
+  try {
+    server = app.listen(PORT, () => {
+      const { createLogger } = require('../services/logging-service/logger');
+      const logger = createLogger();
+      logger.info('WhatsApp middleware server started', { port: PORT });
+      console.log(`WhatsApp middleware running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
 
   // Handle server errors (e.g., port already in use, connection errors)
   server.on('error', (error) => {
+    const currentPort = PORT; // Capture PORT in closure to avoid scope issues
     try {
       const { createLogger } = require('../services/logging-service/logger');
       const logger = createLogger();
-      logger.error('Server error occurred', error, { port: PORT });
+      logger.error('Server error occurred', error, { port: currentPort });
     } catch (loggerError) {
       // Fallback to console if logger fails
       console.error('Server error (logger failed):', error);
@@ -191,7 +229,7 @@ if (require.main === module) {
     
     // Only exit if it's a critical error like port already in use
     if (error.code === 'EADDRINUSE') {
-      console.error(`Port ${PORT} is already in use. Please use a different port.`);
+      console.error(`Port ${currentPort} is already in use. Please use a different port.`);
       process.exit(1);
     }
     // For other errors, log but continue running
@@ -200,24 +238,42 @@ if (require.main === module) {
   // Graceful shutdown handlers
   process.on('SIGTERM', () => {
     console.log('SIGTERM received, shutting down gracefully...');
-    server.close(() => {
-      const { closeRedisClient } = require('../services/redis-service/redisClient');
-      closeRedisClient().then(() => {
-        console.log('Server closed');
-        process.exit(0);
+    if (server) {
+      server.close(() => {
+        const { closeRedisClient } = require('../services/redis-service/redisClient');
+        closeRedisClient()
+          .then(() => {
+            console.log('Server closed');
+            process.exit(0);
+          })
+          .catch((error) => {
+            console.error('Error closing Redis client:', error);
+            process.exit(0); // Exit anyway
+          });
       });
-    });
+    } else {
+      process.exit(0);
+    }
   });
 
   process.on('SIGINT', () => {
     console.log('SIGINT received, shutting down gracefully...');
-    server.close(() => {
-      const { closeRedisClient } = require('../services/redis-service/redisClient');
-      closeRedisClient().then(() => {
-        console.log('Server closed');
-        process.exit(0);
+    if (server) {
+      server.close(() => {
+        const { closeRedisClient } = require('../services/redis-service/redisClient');
+        closeRedisClient()
+          .then(() => {
+            console.log('Server closed');
+            process.exit(0);
+          })
+          .catch((error) => {
+            console.error('Error closing Redis client:', error);
+            process.exit(0); // Exit anyway
+          });
       });
-    });
+    } else {
+      process.exit(0);
+    }
   });
 }
 

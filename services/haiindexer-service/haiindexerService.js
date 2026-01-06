@@ -2,7 +2,7 @@
  * Service for querying HaiIndexer API
  */
 
-const HAIINDEXER_API_URL = process.env.HAIINDEXER_API_URL;
+const HAIINDEXER_API_URL = process.env.HAIINDEXER_API_URL || null;
 const { fetchWithRetry } = require('../utils/retryWithTimeout');
 const { createCircuitBreaker } = require('../utils/circuitBreaker');
 
@@ -40,14 +40,41 @@ async function queryHaiIndexer(normalizedQuery) {
       apiUrl = apiUrl.replace(/\/$/, '') + '/api/ui/query';
     }
 
+    // Prepare headers with Authorization if token is available
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+    
+    // Add Authorization header if token is configured
+    const apiToken = process.env.HAIINDEXER_API_TOKEN;
+    if (apiToken) {
+      headers['Authorization'] = `Bearer ${apiToken}`;
+    } else {
+      // Log warning but don't crash
+      try {
+        const { createLogger } = require('../logging-service/logger');
+        const logger = createLogger();
+        logger.warn('HAIINDEXER_API_TOKEN is not set - requests will be sent without authentication');
+      } catch (loggerError) {
+        console.warn('WARNING: HAIINDEXER_API_TOKEN is not set - requests will be sent without authentication');
+      }
+    }
+
+    // Prepare request body with conversation_id
+    const requestBody = { ...normalizedQuery };
+    
+    // Derive conversation_id from WhatsApp sender ID
+    const waId = normalizedQuery.metadata?.wa_id || normalizedQuery.metadata?.phone_number;
+    if (waId) {
+      requestBody.conversation_id = `whatsapp-${waId}`;
+    }
+
     const response = await fetchWithRetry(
       apiUrl,
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(normalizedQuery),
+        headers: headers,
+        body: JSON.stringify(requestBody),
       },
       {
         timeoutMs: API_TIMEOUT_MS,
@@ -62,21 +89,28 @@ async function queryHaiIndexer(normalizedQuery) {
 
     const data = await response.json();
 
-    // Handle different response formats
-    if (data.answer) {
-      return { answer: data.answer };
+    // Log raw HaiIndexer response
+    console.log("🧠 HaiIndexer RAW response:", data);
+
+    // Log parsed HaiIndexer response
+    const hiResponse = data;
+    console.log("🧠 HaiIndexer parsed response:", hiResponse);
+
+    // Handle different response formats - extended to support multiple shapes
+    const answerText =
+      data.answer ||
+      data.response ||
+      data.data?.answer ||
+      data.final_answer ||
+      data.output ||
+      (typeof data === 'string' ? data : null);
+
+    if (answerText) {
+      return { answer: answerText };
     }
 
-    if (data.response) {
-      return { answer: data.response };
-    }
-
-    if (typeof data === 'string') {
-      return { answer: data };
-    }
-
-    // Fallback
-    return { answer: JSON.stringify(data) };
+    // Fallback if no answer found
+    return { answer: "Sorry, I couldn't find an answer." };
   }, () => {
     // Fallback when circuit is open
     return {

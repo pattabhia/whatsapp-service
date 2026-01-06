@@ -34,9 +34,25 @@ async function getRateLimitRecord(key, windowMs) {
 
   if (useRedis && redisClient) {
     try {
+      // Add timeout to prevent hanging
       const redisKey = `ratelimit:${key}`;
-      const count = await redisClient.get(redisKey);
-      const ttl = await redisClient.ttl(redisKey);
+      const getPromise = redisClient.get(redisKey);
+      const ttlPromise = redisClient.ttl(redisKey);
+      
+      // Race against timeout (2 seconds)
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Redis operation timeout')), 2000)
+      );
+      
+      const result = await Promise.race([
+        Promise.all([getPromise, ttlPromise]).then(([c, t]) => ({ count: c, ttl: t })),
+        timeoutPromise.then(() => { throw new Error('Redis operation timeout'); })
+      ]).catch((error) => {
+        // Re-throw to be caught by outer try-catch
+        throw error;
+      });
+      const count = result.count;
+      const ttl = result.ttl;
 
       if (count !== null) {
         // Key exists, calculate reset time from TTL
@@ -50,7 +66,19 @@ async function getRateLimitRecord(key, windowMs) {
       // Key doesn't exist, create new record
       const resetTime = Date.now() + windowMs;
       const ttlSeconds = Math.ceil(windowMs / 1000);
-      await redisClient.setex(redisKey, ttlSeconds, '0');
+      
+      // Add timeout for setex operation
+      const setexPromise = redisClient.setex(redisKey, ttlSeconds, '0');
+      const setexTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Redis operation timeout')), 2000)
+      );
+      try {
+        await Promise.race([setexPromise, setexTimeoutPromise]);
+      } catch (setexError) {
+        // If setex fails, we can still return a record with count 0
+        // This is a fallback, not a critical error
+        throw new Error('Redis operation failed');
+      }
       return {
         count: 0,
         resetTime,
@@ -91,14 +119,40 @@ async function incrementRateLimit(key, windowMs) {
 
   if (useRedis && redisClient) {
     try {
+      // Add timeout to prevent hanging
       const redisKey = `ratelimit:${key}`;
-      const count = await redisClient.incr(redisKey);
-      const ttl = await redisClient.ttl(redisKey);
+      const incrPromise = redisClient.incr(redisKey);
+      const ttlPromise = redisClient.ttl(redisKey);
+      
+      // Race against timeout (2 seconds)
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Redis operation timeout')), 2000)
+      );
+      
+      const result = await Promise.race([
+        Promise.all([incrPromise, ttlPromise]).then(([c, t]) => ({ count: c, ttl: t })),
+        timeoutPromise.then(() => { throw new Error('Redis operation timeout'); })
+      ]).catch((error) => {
+        // Re-throw to be caught by outer try-catch
+        throw error;
+      });
+      const count = result.count;
+      const ttl = result.ttl;
 
       // If this is a new key, set TTL
       if (ttl === -1) {
         const ttlSeconds = Math.ceil(windowMs / 1000);
-        await redisClient.expire(redisKey, ttlSeconds);
+        const expirePromise = redisClient.expire(redisKey, ttlSeconds);
+        const expireTimeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Redis operation timeout')), 2000)
+        );
+        try {
+          await Promise.race([expirePromise, expireTimeoutPromise]);
+        } catch (expireError) {
+          // Ignore expire timeout - not critical
+          // Log but don't throw
+          console.warn('Redis expire operation timeout (non-critical):', expireError.message);
+        }
       }
 
       const resetTime = Date.now() + (ttl * 1000);
