@@ -3,6 +3,13 @@
  * Print clear errors if missing
  */
 
+// Load environment variables from .env file (for local development)
+try {
+  require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
+} catch (error) {
+  // dotenv is optional - continue without it if not installed
+}
+
 const { getEnvVar } = require('../services/utils/envHelper');
 
 // Check for required variables (supports both old and new names)
