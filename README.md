@@ -1,40 +1,112 @@
 # WhatsApp Adapter
 
-A service component for the HAI-INDEXER system that handles WhatsApp integration and messaging functionality.
+A production-ready middleware service that connects WhatsApp Business API to the HaiIndexer AI system. Acts as a stateless integration layer for message flow, normalization, and delivery.
 
-## Documentation
+## Status
 
-This repository contains architectural documentation and diagrams for the WhatsApp service integration.
+All critical features implemented including circuit breaker, retry logic, rate limiting, idempotency, message splitting, and comprehensive error handling.
 
----
+## Quick Start
+
+### Prerequisites
+
+- Node.js >= 18.0.0
+- Redis (optional, recommended for multi-instance deployments)
+
+### Installation
+
+```bash
+cd backend
+npm install
+```
+
+### Configuration
+
+Set required environment variables:
+
+```bash
+export WHATSAPP_API_TOKEN="your_token"
+export WHATSAPP_PHONE_NUMBER_ID="your_phone_id"
+export WEBHOOK_VERIFY_TOKEN="your_verify_token"
+export HAIINDEXER_API_URL="haiindexer_public_URL"
+
+# Recommended
+export WHATSAPP_APP_SECRET="your_app_secret"
+export REDIS_URL="redis://localhost:6379"  # Optional
+```
+
+### Run
+
+```bash
+# Validate configuration
+node backend/test-setup.js
+
+# Start server
+node backend/server.js
+```
+
+### Verify
+
+```bash
+curl http://localhost:3000/health
+curl http://localhost:3000/ready
+```
+
+## Features
+
+### Core Features
+- ✅ WhatsApp webhook handling
+- ✅ Message normalization
+- ✅ HaiIndexer API integration
+- ✅ Error handling with user feedback
+
+### Production Features
+- ✅ **Circuit Breaker** - Prevents cascading failures
+- ✅ **Retry Logic** - Exponential backoff for API calls
+- ✅ **Rate Limiting** - Redis-based with in-memory fallback
+- ✅ **Idempotency** - Prevents duplicate processing
+- ✅ **Message Splitting** - Handles long messages intelligently
+- ✅ **Health Checks** - Kubernetes-ready endpoints
+- ✅ **Structured Logging** - JSON logs with correlation IDs
+- ✅ **Webhook Signature Validation** - Security protection
 
 ## Architecture Diagrams
 
 ### Integration Architecture Diagram
 
-![Integration Architecture Diagram](docs/integration-architecture-diagram.png)
+See [Implementation Summary](docs/IMPLEMENTATION_SUMMARY.md) for detailed architecture.
 
-> Shows the overall system architecture and how the WhatsApp service integrates with other components.
+## Documentation
 
----
+- **[Implementation Summary](docs/IMPLEMENTATION_SUMMARY.md)** - Complete implementation overview
+- **[Audit Summary](docs/AUDIT_SUMMARY.md)** - Architecture audit and compliance
+- **[Architecture Diagrams](docs/)** - Integration and sequence diagrams
 
-### Sequence Diagram
+## API Endpoints
 
-![Sequence Diagram](docs/sequence-diagram.png)
+- `GET /webhook` - Webhook verification
+- `POST /webhook` - Message receiving endpoint
+- `GET /health` - Health check
+- `GET /ready` - Readiness probe
+- `GET /live` - Liveness probe
 
-> Illustrates the message flow and interaction sequences within the WhatsApp service.
+## Technology Stack
 
----
+- **Runtime**: Node.js >= 18.0.0
+- **Framework**: Express.js
+- **Cache**: Redis (optional, ioredis)
+- **Deployment**: Vercel-ready, Docker/Kubernetes compatible
 
 ## Status
 
-This project is currently in the planning/design phase.  
-Comprehensive documentation and implementation will be added in future updates.
+- All critical features implemented
+- Comprehensive error handling
+- Production-grade reliability features
+- Health checks and monitoring
+- Configuration validation
 
-## Getting Started
-
-_Coming soon – detailed setup and installation instructions will be provided once implementation begins._
+See [Audit Summary](docs/AUDIT_SUMMARY.md) for detailed compliance report.
 
 ## Contributing
 
-_Coming soon – contribution guidelines will be added as the project develops._
+This is a production service. Changes should be tested and validated before deployment.

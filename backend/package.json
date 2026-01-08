@@ -1,0 +1,31 @@
+{
+  "name": "whatsapp-middleware",
+  "version": "1.0.0",
+  "description": "Simple WhatsApp middleware connecting WhatsApp Cloud API to HaiIndexer",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test-setup": "node test-setup.js",
+    "dev": "node server.js",
+    "test": "node tests/run-all-tests.js",
+    "test:timeout": "node --test tests/timeout.test.js",
+    "test:retry": "node --test tests/retry.test.js",
+    "test:rate": "node --test tests/rateLimiting.test.js",
+    "test:length": "node --test tests/messageLength.test.js"
+  },
+  "keywords": [
+    "whatsapp",
+    "middleware",
+    "haiindexer"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "express": "^4.18.2",
+    "ioredis": "^5.3.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
