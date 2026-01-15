@@ -1,0 +1,13 @@
+{
+  "name": "whatsapp-service-root",
+  "version": "1.0.0",
+  "description": "WhatsApp Service - Azure deployment wrapper",
+  "scripts": {
+    "install": "cd backend && npm install",
+    "start": "cd backend && npm start"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+
