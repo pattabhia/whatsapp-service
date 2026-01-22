@@ -200,15 +200,14 @@ if (require.main === module) {
   }
   
   const PORT = process.env.PORT || 3000;
-  const HOST = process.env.HOST || '0.0.0.0'; // Bind to all interfaces for container environments
   let server;
-
+  
   try {
-    server = app.listen(PORT, HOST, () => {
+    server = app.listen(PORT, () => {
       const { createLogger } = require('../services/logging-service/logger');
       const logger = createLogger();
-      logger.info('WhatsApp middleware server started', { port: PORT, host: HOST });
-      console.log(`WhatsApp middleware running on ${HOST}:${PORT}`);
+      logger.info('WhatsApp middleware server started', { port: PORT });
+      console.log(`WhatsApp middleware running on port ${PORT}`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);
