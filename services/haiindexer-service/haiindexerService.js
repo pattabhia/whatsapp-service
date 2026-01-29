@@ -8,9 +8,10 @@ const { fetchWithRetry } = require('../utils/retryWithTimeout');
 const { createCircuitBreaker } = require('../utils/circuitBreaker');
 
 // Configuration
-const API_TIMEOUT_MS = parseInt(process.env.HAIINDEXER_API_TIMEOUT_MS || '30000', 10); // 30 seconds default
-const API_MAX_RETRIES = parseInt(process.env.HAIINDEXER_API_MAX_RETRIES || '3', 10);
-const API_RETRY_DELAY_MS = parseInt(process.env.HAIINDEXER_API_RETRY_DELAY_MS || '1000', 10);
+// Reduced timeout to prevent WhatsApp webhook timeout (WhatsApp expects response within ~20s)
+const API_TIMEOUT_MS = parseInt(process.env.HAIINDEXER_API_TIMEOUT_MS || '10000', 10); // 10 seconds default (was 30s)
+const API_MAX_RETRIES = parseInt(process.env.HAIINDEXER_API_MAX_RETRIES || '1', 10); // 1 retry max (was 3)
+const API_RETRY_DELAY_MS = parseInt(process.env.HAIINDEXER_API_RETRY_DELAY_MS || '500', 10); // 500ms delay (was 1s)
 
 // Circuit breaker configuration
 const CIRCUIT_BREAKER_CONFIG = {
