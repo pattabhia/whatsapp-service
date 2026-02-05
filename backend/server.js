@@ -23,7 +23,7 @@ const express = require('express');
 const webhookHandler = require('./webhookHandler');
 const healthChecks = require('./health');
 // Use Redis-based rate limiter if Redis is available, otherwise fall back to in-memory
-const { webhookRateLimiter } = require('./middleware/rateLimiterRedis');
+const { webhookRateLimiter, perPhoneNumberRateLimiter } = require('./middleware/rateLimiterRedis');
 
 const app = express();
 
@@ -81,6 +81,7 @@ app.get('/webhook', webhookRateLimiter, webhookHandler.verify);
 
 // For webhook POST, we need raw body for signature verification
 // Parse JSON after storing raw body
+// Apply both IP-based and phone-number-based rate limiting
 app.post('/webhook', webhookRateLimiter, express.raw({ type: 'application/json' }), async (req, res, next) => {
   try {
     // Store raw body for signature verification
@@ -114,7 +115,7 @@ app.post('/webhook', webhookRateLimiter, express.raw({ type: 'application/json' 
       res.status(500).json({ error: 'Internal server error' });
     }
   }
-}, webhookHandler.handleMessage);
+}, perPhoneNumberRateLimiter, webhookHandler.handleMessage);
 
 // JSON parser for other routes (if any)
 app.use(express.json());

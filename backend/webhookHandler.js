@@ -9,6 +9,9 @@ const { formatForWhatsApp } = require('../services/utils/whatsappFormatter');
 
 const { WHATSAPP_MESSAGE_MAX_LENGTH } = whatsappService;
 
+// Input validation limits
+const MAX_INPUT_MESSAGE_LENGTH = parseInt(process.env.MAX_INPUT_MESSAGE_LENGTH || '4000', 10); // 4k characters default
+
 // Load webhook verification token directly from environment
 const VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN;
 
@@ -181,12 +184,62 @@ async function processMessage(message, value, logger) {
   // Strict validation: Only process text messages with valid text body
   // Ensure message type is "text" and message.text.body exists
   if (message.type !== 'text' || !message.text || !messageText || messageText.trim().length === 0) {
-    logger.debug('Ignoring non-text or empty message', { 
-      message_id: messageId, 
+    logger.debug('Ignoring non-text or empty message', {
+      message_id: messageId,
       type: message.type,
       has_text: !!message.text,
       has_body: !!messageText
     });
+
+    // Send user-friendly feedback for non-text messages
+    if (message.type !== 'text' && message.type) {
+      try {
+        const messageTypeMap = {
+          'image': 'images',
+          'audio': 'audio messages',
+          'video': 'videos',
+          'document': 'documents',
+          'sticker': 'stickers',
+          'location': 'location messages',
+          'contacts': 'contact cards',
+        };
+        const messageTypeName = messageTypeMap[message.type] || 'this type of message';
+        await whatsappService.sendTextMessage(
+          senderPhone,
+          `I can only process text messages. I cannot handle ${messageTypeName} yet. Please send your question as text.`
+        );
+        logger.info('Sent non-text message feedback', {
+          sender_phone: senderPhone,
+          message_type: message.type
+        });
+      } catch (feedbackError) {
+        logger.warn('Failed to send non-text message feedback', feedbackError);
+      }
+    }
+
+    return;
+  }
+
+  // Validate message length (prevent very long messages from reaching HaiIndexer)
+  const trimmedText = messageText.trim();
+  if (trimmedText.length > MAX_INPUT_MESSAGE_LENGTH) {
+    logger.warn('Message exceeds maximum length', {
+      message_id: messageId,
+      sender_phone: senderPhone,
+      message_length: trimmedText.length,
+      max_length: MAX_INPUT_MESSAGE_LENGTH,
+    });
+
+    try {
+      await whatsappService.sendTextMessage(
+        senderPhone,
+        `Your message is too long (${trimmedText.length} characters). Please keep your questions under ${MAX_INPUT_MESSAGE_LENGTH} characters and try again.`
+      );
+      logger.info('Sent message too long feedback', { sender_phone: senderPhone });
+    } catch (feedbackError) {
+      logger.warn('Failed to send message too long feedback', feedbackError);
+    }
+
     return;
   }
 

@@ -3,13 +3,15 @@
  */
 
 const HAIINDEXER_API_URL = process.env.HAIINDEXER_API_URL || null;
+const HAIINDEXER_API_TOKEN = process.env.HAIINDEXER_API_TOKEN || null;
 const { fetchWithRetry } = require('../utils/retryWithTimeout');
 const { createCircuitBreaker } = require('../utils/circuitBreaker');
 
 // Configuration
-const API_TIMEOUT_MS = parseInt(process.env.HAIINDEXER_API_TIMEOUT_MS || '30000', 10); // 30 seconds default
-const API_MAX_RETRIES = parseInt(process.env.HAIINDEXER_API_MAX_RETRIES || '3', 10);
-const API_RETRY_DELAY_MS = parseInt(process.env.HAIINDEXER_API_RETRY_DELAY_MS || '1000', 10);
+// Reduced timeout to prevent WhatsApp webhook timeout (WhatsApp expects response within ~20s)
+const API_TIMEOUT_MS = parseInt(process.env.HAIINDEXER_API_TIMEOUT_MS || '10000', 10); // 10 seconds default (was 30s)
+const API_MAX_RETRIES = parseInt(process.env.HAIINDEXER_API_MAX_RETRIES || '1', 10); // 1 retry max (was 3)
+const API_RETRY_DELAY_MS = parseInt(process.env.HAIINDEXER_API_RETRY_DELAY_MS || '500', 10); // 500ms delay (was 1s)
 
 // Circuit breaker configuration
 const CIRCUIT_BREAKER_CONFIG = {
@@ -34,13 +36,18 @@ const TOKEN_CACHE_TTL_MS = 30 * 60 * 1000;
  * @returns {Promise<string|null>} Bearer token or null on failure
  */
 async function getHaiIndexerBearerToken() {
+  // If permanent token is configured, use it directly (production)
+  if (HAIINDEXER_API_TOKEN) {
+    return HAIINDEXER_API_TOKEN;
+  }
+
   // Check if cached token exists and is less than 30 minutes old
   const now = Date.now();
   if (cachedToken && cachedTokenFetchedAt && (now - cachedTokenFetchedAt) < TOKEN_CACHE_TTL_MS) {
     return cachedToken;
   }
 
-  // Need to fetch new token
+  // Need to fetch new token (development only)
   if (!HAIINDEXER_API_URL) {
     return null;
   }
@@ -176,28 +183,30 @@ async function queryHaiIndexer(normalizedQuery) {
     const headers = {
       'Content-Type': 'application/json',
     };
-    
-    // Fetch bearer token automatically (dev-only test token)
+
+    // Get bearer token (permanent token from env or auto-fetched test token)
     const apiToken = await getHaiIndexerBearerToken();
     if (apiToken) {
       headers['Authorization'] = `Bearer ${apiToken}`;
     }
-    // If token fetch fails, continue without auth header (existing fallback behavior)
+    // If token is not available, continue without auth header (fallback behavior)
 
     // Prepare request body - HaiIndexer expects 'query' field instead of 'message'
-    const requestBody = { ...normalizedQuery };
-    
-    // Map 'message' to 'query' as HaiIndexer API expects 'query' field
-    if (requestBody.message && !requestBody.query) {
-      requestBody.query = requestBody.message;
-      // Optionally keep message for backward compatibility, or remove it
-      // delete requestBody.message;
-    }
-    
+    const requestBody = {
+      query: normalizedQuery.message || normalizedQuery.query,
+      tenant_id: "default",
+      top_k: 5
+    };
+
     // Derive conversation_id from WhatsApp sender ID
     const waId = normalizedQuery.metadata?.wa_id || normalizedQuery.metadata?.phone_number;
     if (waId) {
       requestBody.conversation_id = `whatsapp-${waId}`;
+    }
+
+    // Include user_id if available
+    if (normalizedQuery.user_id) {
+      requestBody.user_id = normalizedQuery.user_id;
     }
 
     const response = await fetchWithRetry(

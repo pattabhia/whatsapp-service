@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  whatsapp-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: whatsapp-service
+    environment:
+      - WHATSAPP_API_TOKEN=${WHATSAPP_API_TOKEN}
+      - WHATSAPP_PHONE_NUMBER_ID=${WHATSAPP_PHONE_NUMBER_ID}
+      - WEBHOOK_VERIFY_TOKEN=${WEBHOOK_VERIFY_TOKEN}
+      - HAIINDEXER_API_URL=${HAIINDEXER_API_URL}
+      - WHATSAPP_APP_SECRET=${WHATSAPP_APP_SECRET}
+      - PORT=3000
+      - HOST=0.0.0.0
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - whatsapp-network
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+    depends_on:
+      - whatsapp-service
+    networks:
+      - whatsapp-network
+
+networks:
+  whatsapp-network:
+    driver: bridge
+
+volumes:
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local
+

@@ -1,0 +1,42 @@
+# Node modules
+node_modules
+backend/node_modules
+npm-debug.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Git
+.git
+.gitignore
+
+# Documentation
+docs/
+*.md
+README.md
+
+# Tests
+backend/tests/
+backend/test-haiindexer-to-whatsapp.js
+
+# Deployment files
+*.zip
+deploy*.sh
+deploy*.ps1
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Vercel
+backend/vercel.json
+.vercel
+

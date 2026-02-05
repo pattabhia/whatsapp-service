@@ -239,7 +239,7 @@ function createRateLimiter(options = {}) {
 }
 
 /**
- * Rate limiter for webhook endpoints
+ * Rate limiter for webhook endpoints (IP-based)
  * More lenient than general API endpoints
  */
 const webhookRateLimiter = createRateLimiter({
@@ -251,8 +251,39 @@ const webhookRateLimiter = createRateLimiter({
   },
 });
 
+/**
+ * Per-phone-number rate limiter for WhatsApp messages
+ * Prevents abuse from individual users
+ */
+const perPhoneNumberRateLimiter = createRateLimiter({
+  windowMs: 1 * 60 * 1000, // 1 minute window
+  maxRequests: 10, // 10 messages per minute per phone number
+  keyGenerator: (req) => {
+    // Extract phone number from WhatsApp webhook payload
+    try {
+      const body = req.body;
+      const entry = body?.entry?.[0];
+      const changes = entry?.changes?.[0];
+      const value = changes?.value;
+      const message = value?.messages?.[0];
+      const phoneNumber = message?.from;
+
+      if (phoneNumber) {
+        return `phone:${phoneNumber}`;
+      }
+    } catch (error) {
+      // If we can't extract phone number, fall back to IP
+      console.warn('Could not extract phone number for rate limiting:', error.message);
+    }
+
+    // Fallback to IP if phone number not available
+    return `ip:${req.ip || req.connection.remoteAddress || 'unknown'}`;
+  },
+});
+
 module.exports = {
   createRateLimiter,
   webhookRateLimiter,
+  perPhoneNumberRateLimiter,
 };
 
